@@ -1,7 +1,7 @@
 import type { AvatarEngine } from "../engine/AvatarEngine";
 import { emotions, clamp01, type Emotion, type BehaviorState } from "../engine/behaviorConfig";
 import type { PlaybackFrame } from "../../services/audio/PcmPlayer";
-import type { ConnectionState } from "../../services/gemini/GeminiLiveClient";
+import type { ConnectionState } from "../../services/local-ai/LocalConversationClient";
 
 /** Coordinates playback events without React or an independent animation loop. */
 export class ConversationCoordinator {
