@@ -12,7 +12,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
   const isActive = (href: string) => href === "/admin" ? pathname === href : pathname === href || pathname.startsWith(`${href}/`);
   return <div className="admin-shell">
     <aside className={`admin-sidebar ${open ? "is-open" : ""}`}>
-      <div className="admin-brand"><div className="admin-logo">✦</div><div><strong>Avatar Studio</strong><span>Admin workspace</span></div></div>
+      <div className="admin-brand"><div className="admin-logo">✦</div><div><strong>TR Avtaar</strong><span>Avatar management</span></div></div>
       <nav className="admin-nav"><p className="admin-nav-label">Workspace</p>{navItems.slice(0, 4).map(([label, href, icon]) => <Link key={href} href={href} onClick={() => setOpen(false)} className={isActive(href) ? "is-active" : ""} aria-current={isActive(href) ? "page" : undefined}><i aria-hidden="true">{icon}</i><span>{label}</span>{label === "Create Avatar" && <b>New</b>}</Link>)}<p className="admin-nav-label admin-nav-label-spaced">Manage</p>{navItems.slice(4).map(([label, href, icon]) => <Link key={href} href={href} onClick={() => setOpen(false)} className={isActive(href) ? "is-active" : ""} aria-current={isActive(href) ? "page" : undefined}><i aria-hidden="true">{icon}</i><span>{label}</span></Link>)}</nav>
       <div className="admin-sidebar-bottom"><div className="admin-help"><span>?</span><div><strong>Need help?</strong><small>Read the admin guide</small></div></div><div className="admin-profile"><div className="admin-avatar-circle">JD</div><div><strong>Jordan Davis</strong><small>Administrator</small></div><span>•••</span></div></div>
     </aside>
