@@ -6,13 +6,13 @@ import type { BehaviorState } from "@/avatar/engine/behaviorConfig";
 import { MicrophoneCapture } from "@/services/audio/MicrophoneCapture";
 import { PcmPlayer, type PlaybackFrame } from "@/services/audio/PcmPlayer";
 import { encodePcm16, OUTPUT_SAMPLE_RATE } from "@/services/audio/pcm";
-import { GeminiLiveClient, type ConnectionState } from "@/services/gemini/GeminiLiveClient";
+import { LocalConversationClient, type ConnectionState } from "@/services/local-ai/LocalConversationClient";
 
 import type { AvatarReady } from "@/components/avatar/Avatar";
 
 interface Transcript { speaker: "user" | "avatar"; text: string; finished: boolean }
 interface Resources {
-  player: PcmPlayer; mic: MicrophoneCapture; live: GeminiLiveClient;
+  player: PcmPlayer; mic: MicrophoneCapture; live: LocalConversationClient;
   connection: ConnectionState;
   active: boolean; operation: number;
   recording: boolean; recordingBytes: Uint8Array[];
@@ -52,7 +52,7 @@ export function useAvatarConversation() {
       coordinator.updatePlayback(frame); syncAvatar();
       if (!frame.playing || performance.now() - lastFrame > 100) { lastFrame = performance.now(); setPlayback(frame); }
     });
-    const live = new GeminiLiveClient({
+    const live = new LocalConversationClient({
       onState: (next) => {
         if (!active || !resources.current) return;
         resources.current.connection = next; coordinator.setConnection(next); setConnection(next); setEmotionState(coordinator.emotion);
@@ -127,7 +127,7 @@ export function useAvatarConversation() {
     const operation = value.operation;
     setError("");
     try {
-      await value.player.activate(); if (!isCurrent(value, operation)) return; value.live.sendText(text);
+      await value.player.activate(); if (!isCurrent(value, operation)) return; await value.live.sendText(text);
       coordinator.beginTurn(); syncAvatar();
       setTranscripts((items) => [...items.slice(-19), { speaker: "user", text: text.trim(), finished: true }]); setText("");
     } catch (cause) { if (isCurrent(value, operation)) setError(cause instanceof Error ? cause.message : "Message could not be sent."); }
