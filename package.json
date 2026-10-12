@@ -13,6 +13,7 @@
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "db:studio": "prisma studio",
+    "auth:create-admin": "tsx scripts/create-admin.ts",
     "local-ai:health": "tsx scripts/check-local-ai.ts",
     "local-ai:up": "docker compose up -d postgres ollama ollama-model"
   },
