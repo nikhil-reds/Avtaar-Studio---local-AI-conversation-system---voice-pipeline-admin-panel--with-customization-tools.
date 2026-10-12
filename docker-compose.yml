@@ -1,0 +1,86 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: avatar-studio-postgres
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:5432:5432"
+    environment:
+      POSTGRES_DB: avatar_studio
+      POSTGRES_USER: avatar_admin
+      POSTGRES_PASSWORD: local_dev_password
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U avatar_admin -d avatar_studio"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    volumes:
+      - avatar_postgres_data:/var/lib/postgresql/data
+
+  ollama:
+    image: ollama/ollama:latest
+    container_name: avatar-studio-ollama
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:11434:11434"
+    environment:
+      OLLAMA_HOST: 0.0.0.0:11434
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    volumes:
+      - avatar_ollama_data:/root/.ollama
+
+  ollama-model:
+    image: curlimages/curl:8.10.1
+    container_name: avatar-studio-ollama-model
+    depends_on:
+      ollama:
+        condition: service_healthy
+    restart: "no"
+    entrypoint: ["/bin/sh", "-c"]
+    command: ["until curl -sf http://ollama:11434/api/tags >/dev/null; do sleep 2; done; curl -sf http://ollama:11434/api/pull -d '{\"name\":\"qwen3:14b\"}'"]
+
+  stt:
+    build:
+      context: ./services/stt
+    container_name: avatar-studio-stt
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8101:8101"
+    environment:
+      STT_MODEL: ${LOCAL_STT_MODEL:-base.en}
+      STT_DEVICE: ${LOCAL_STT_DEVICE:-cpu}
+      STT_COMPUTE_TYPE: ${LOCAL_STT_COMPUTE_TYPE:-int8}
+    volumes:
+      - avatar_stt_models:/models
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8101/health')"]
+      interval: 15s
+      timeout: 5s
+      retries: 20
+
+  tts:
+    build:
+      context: ./services/tts
+    container_name: avatar-studio-tts
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8102:8102"
+    environment:
+      TTS_VOICE: ${LOCAL_TTS_VOICE:-en_US-lessac-medium}
+    volumes:
+      - avatar_tts_models:/models
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8102/health')"]
+      interval: 15s
+      timeout: 5s
+      retries: 20
+
+volumes:
+  avatar_postgres_data:
+  avatar_ollama_data:
+  avatar_stt_models:
+  avatar_tts_models:
