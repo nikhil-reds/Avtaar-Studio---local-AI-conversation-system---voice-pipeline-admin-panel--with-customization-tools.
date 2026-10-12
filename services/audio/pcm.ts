@@ -58,7 +58,7 @@ export function rms(samples: Float32Array): number {
 }
 
 export function audioSampleRate(mimeType = "audio/pcm;rate=24000"): number {
-  if (!/^audio\/(pcm|l16)(;|$)/i.test(mimeType)) throw new Error("Gemini returned an unsupported audio format.");
+  if (!/^audio\/(pcm|l16)(;|$)/i.test(mimeType)) throw new Error("The local AI returned an unsupported audio format.");
   const rate = Number(/rate=(\d+)/i.exec(mimeType)?.[1] ?? OUTPUT_SAMPLE_RATE);
   if (rate < 8000 || rate > 96000) throw new Error("Unsupported playback sample rate.");
   return rate;
