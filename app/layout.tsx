@@ -13,8 +13,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Avatar Studio",
-  description: "A local 3D avatar viewer and rig inspection workspace.",
+  title: "TR Avtaar",
+  description: "TR Avtaar is an intelligent digital avatar platform for creating, managing, and deploying expressive AI avatars.",
 };
 
 // Runs before first paint so the saved (or system) theme never flashes the wrong colors.
