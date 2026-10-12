@@ -77,41 +77,38 @@ export class BlinkCoordinator {
   }
 
   private advance(delta: number): void {
-    if (this.state === "open") {
-      this.blinkWeight = 0;
-      this.timeUntilNext -= delta;
-      if (this.timeUntilNext <= 0) this.startClosing();
-      else return;
-    }
-
-    if (this.state === "closing") {
-      this.elapsed += delta;
-      this.blinkWeight = smooth(this.elapsed / Math.max(1e-6, this.config.closeDuration));
-      if (this.elapsed >= this.config.closeDuration) {
-        this.state = "closed";
-        this.elapsed = 0;
-        this.blinkWeight = 1;
+    let remaining = delta;
+    while (remaining > 1e-9) {
+      if (this.state === "open") {
+        this.blinkWeight = 0;
+        if (this.timeUntilNext > remaining) { this.timeUntilNext -= remaining; return; }
+        remaining -= Math.max(0, this.timeUntilNext);
+        this.startClosing();
+        if (remaining <= 1e-9) return;
       }
-      return;
-    }
-
-    if (this.state === "closed") {
-      this.elapsed += delta;
-      this.blinkWeight = 1;
-      if (this.elapsed >= this.config.closedDuration) {
-        this.state = "opening";
-        this.elapsed = 0;
+      if (this.state === "closing") {
+        const duration = Math.max(1e-6, this.config.closeDuration);
+        const available = Math.min(remaining, Math.max(0, duration - this.elapsed));
+        this.elapsed += available; remaining -= available;
+        this.blinkWeight = smooth(this.elapsed / duration);
+        if (this.elapsed < duration) return;
+        this.state = "closed"; this.elapsed = 0; this.blinkWeight = 1;
+        if (remaining <= 1e-9) return;
       }
-      return;
-    }
-
-    this.elapsed += delta;
-    this.blinkWeight = 1 - smooth(this.elapsed / Math.max(1e-6, this.config.openDuration));
-    if (this.elapsed >= this.config.openDuration) {
-      this.state = "open";
-      this.elapsed = 0;
-      this.blinkWeight = 0;
-      this.timeUntilNext = this.nextInterval();
+      if (this.state === "closed") {
+        const duration = Math.max(1e-6, this.config.closedDuration);
+        const available = Math.min(remaining, Math.max(0, duration - this.elapsed));
+        this.elapsed += available; remaining -= available; this.blinkWeight = 1;
+        if (this.elapsed < duration) return;
+        this.state = "opening"; this.elapsed = 0;
+        if (remaining <= 1e-9) return;
+      }
+      const duration = Math.max(1e-6, this.config.openDuration);
+      const available = Math.min(remaining, Math.max(0, duration - this.elapsed));
+      this.elapsed += available; remaining -= available;
+      this.blinkWeight = 1 - smooth(this.elapsed / duration);
+      if (this.elapsed < duration) return;
+      this.state = "open"; this.elapsed = 0; this.blinkWeight = 0; this.timeUntilNext = this.nextInterval();
     }
   }
 
@@ -131,7 +128,10 @@ export class BlinkCoordinator {
 
   private safeDelta(delta: number): number {
     if (!Number.isFinite(delta) || delta <= 0) return 0;
-    return Math.min(delta, Math.max(0.001, finite(this.config.maxDeltaTime, defaultBlinkConfig.maxDeltaTime)));
+    // A caller may intentionally advance a deterministic simulation by more than
+    // one frame (for example, when restoring a paused preview). Do not discard
+    // elapsed time; the state machine itself handles phase transitions safely.
+    return delta;
   }
 
   private output(): BlinkOutput {
