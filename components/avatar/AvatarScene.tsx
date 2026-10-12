@@ -1,7 +1,7 @@
 "use client";
 import Image from "next/image";
 import Link from "next/link";
-import { Component, Suspense, useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { cloneElement, Component, isValidElement, Suspense, useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { Canvas, useThree } from "@react-three/fiber";
 import { OrbitControls, useProgress } from "@react-three/drei";
 import type { OrbitControls as OrbitControlsImpl } from "three-stdlib";
@@ -107,14 +107,14 @@ export default function AvatarScene({ variant = "studio", onModelReady, sidebar,
     setModel(next); onModelReady?.(next);
   }, [onModelReady, studio]);
   const cameraControls = <><button disabled={!model} aria-pressed={closeUp} onClick={() => setCloseUp((value) => !value)}>{closeUp ? "Full body" : "Face view"}</button><button disabled={!model} onClick={() => setRevision((value) => value + 1)}>Reset camera</button></>;
-  return <div className={`avatar-workspace ${adminAppearance ? "admin-appearance-workspace" : ""}`}>
-    {!adminAppearance && <header className="workspace-header">
-      <div className="brand"><Image className="brand-mark" src="/logo-mark.png" alt="" width={40} height={40} unoptimized priority /><div><h1>Avatar Studio</h1><p className="muted">{studio ? "Pose, express and preview your rigged avatar" : "Live conversation with your avatar"}</p></div></div>
+  return <div className={`avatar-workspace ${studio ? "" : "connected-workspace"} ${adminAppearance ? "admin-appearance-workspace" : ""}`}>
+    {!adminAppearance && studio && <header className="workspace-header">
+      <div className="brand"><Image className="brand-mark" src="/logo-mark.png" alt="" width={40} height={40} unoptimized priority /><div><h1>TR Avtaar</h1><p className="muted">{studio ? "Pose, express and preview your rigged avatar" : "Live conversation with your avatar"}</p></div></div>
       <div className="header-actions">{studio ? <><Link className="connect-avatar-button" href="/avtaar-connected">Connect avatar<ArrowRightIcon /></Link></> : <Link className="back-link" href="/">Back to studio</Link>}</div>
     </header>}
     <div className={`workspace-grid ${studio && !debug ? "panel-hidden" : ""}`}>
       <section className="viewer-section" aria-label="Interactive avatar viewer">
-        <div className="viewer-toolbar"><span className="asset-label"><span className={`status-dot ${model ? "ready" : ""}`} />{adminAppearance ? "Appearance preview" : model ? `${modelProfile.url.slice(1)} · Ready` : `${modelProfile.url.slice(1)} · Loading`}</span><div>{studio && <><button className="demo-button" disabled={!model} aria-pressed={demo} onClick={() => demoRef.current?.toggleDemo()}>{demo ? "Stop blend demo" : "Run blend demo"}</button><button className="save-button" disabled={!model} onClick={save} title="Save pose, face, behavior, lighting and camera so /avtaar-connected shows the same look"><SaveIcon />Save look</button></>}{cameraControls}{studio && <button aria-expanded={debug} onClick={() => setDebug((value) => !value)}>{debug ? "Hide panel" : "Show panel"}</button>}</div></div>
+        <div className="viewer-toolbar"><span className="asset-label"><span className={`status-dot ${model ? "ready" : ""}`} />{adminAppearance ? "Appearance preview" : model ? `${modelProfile.url.slice(1)} · Ready` : `${modelProfile.url.slice(1)} · Loading`}</span><div>{studio && <><button className="demo-button" disabled={!model} aria-pressed={demo} onClick={() => demoRef.current?.toggleDemo()}>{demo ? "Stop blend demo" : "Run blend demo"}</button><button className="save-button" disabled={!model} onClick={save} title="Save pose, face, behavior, lighting and camera so /avtaar-connected shows the same look"><SaveIcon />Save look</button>{cameraControls}</>}{studio && <button aria-expanded={debug} onClick={() => setDebug((value) => !value)}>{debug ? "Hide panel" : "Show panel"}</button>}</div></div>
         <div className="canvas-shell" style={{ background: theme.horizon }}>{studio && <ThemePicker themeId={custom ? customThemeId : themeId} label={theme.label} onChange={chooseTheme} />}<DebugMetricsOverlay model={model} playback={playback} /><ViewerBoundary>
           <Canvas shadows dpr={[1, 1.5]} camera={{ position: [0, 1.65, 5], fov: 38, near: 0.01, far: 100 }} gl={{ antialias: true }} fallback={<div className="viewer-error" role="alert">WebGL is unavailable. Enable hardware acceleration or use a supported browser.</div>}>
             <color attach="background" args={[theme.horizon]} /><fog attach="fog" args={[theme.horizon, 12, 28]} />
@@ -130,7 +130,7 @@ export default function AvatarScene({ variant = "studio", onModelReady, sidebar,
         </ViewerBoundary></div>
         <footer className="viewer-footer"><span>Drag to orbit · Scroll or pinch to zoom</span><span>{studio ? "Local GLB · No audio connected" : "Local GLB"}</span></footer>
       </section>
-      <div className="sidebar-slot" hidden={studio && !debug}>{studio ? <AvatarDebugPanel model={model} demoRef={demoRef} onDemoChange={setDemo} lighting={lighting} save={saveControls} /> : sidebar}</div>
+      <div className="sidebar-slot" hidden={studio && !debug}>{studio ? <AvatarDebugPanel model={model} demoRef={demoRef} onDemoChange={setDemo} lighting={lighting} save={saveControls} /> : isValidElement(sidebar) ? cloneElement(sidebar, { cameraControls }) : sidebar}</div>
     </div>
   </div>;
 }
