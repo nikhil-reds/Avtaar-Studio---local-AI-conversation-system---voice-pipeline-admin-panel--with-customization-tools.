@@ -42,3 +42,12 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+
+generated/
+scripts/
+public/avtaar-rigged-blender/Untitled.glb
+public/avtaar-rigged-blender/Untitled.slim.glb
+
+.next/
+
