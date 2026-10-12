@@ -11,7 +11,6 @@ import type { ModelReport } from "@/avatar/types";
 import Avatar, { type AvatarReady } from "./Avatar";
 import SceneBackdrop from "./SceneBackdrop";
 import { applyAvatarState, captureAvatarState, clearSavedState, loadSavedState, saveState, type AvatarState } from "@/avatar/state/avatarState";
-import ThemeToggle from "@/components/ThemeToggle";
 import { ArrowRightIcon, SaveIcon } from "@/components/ui/icons";
 import { sceneThemes, findTheme, defaultThemeId, themeStorageKey, customStorageKey, customThemeId, parseCustomTheme, cloneTheme, type SceneTheme } from "./sceneThemes";
 import AvatarDebugPanel, { type BlendDemoControls } from "./AvatarDebugPanel";
@@ -58,8 +57,9 @@ function CameraRig({ revision, closeUp, report }: { revision: number; closeUp: b
   }, [camera, size.width, size.height, revision, closeUp, report, invalidate]);
   return <OrbitControls ref={controls} makeDefault enablePan={false} minDistance={0.85} maxDistance={12} minPolarAngle={0.45} maxPolarAngle={Math.PI / 2 + 0.1} />;
 }
-export default function AvatarScene({ variant = "studio", onModelReady, sidebar, playback }: { variant?: "studio" | "connected"; onModelReady?: (model: AvatarReady | null) => void; sidebar?: ReactNode; playback?: PlaybackFrame }) {
-  const studio = variant === "studio";
+export default function AvatarScene({ variant = "studio", onModelReady, sidebar, playback }: { variant?: "studio" | "connected" | "admin-appearance"; onModelReady?: (model: AvatarReady | null) => void; sidebar?: ReactNode; playback?: PlaybackFrame }) {
+  const studio = variant !== "connected";
+  const adminAppearance = variant === "admin-appearance";
   const [model, setModel] = useState<AvatarReady | null>(null);
   const [debug, setDebug] = useState(true);
   // This scene is client-only (ssr: false), so stored values can seed the initial state.
@@ -103,18 +103,18 @@ export default function AvatarScene({ variant = "studio", onModelReady, sidebar,
   const demoRef = useRef<BlendDemoControls>(null);
   const onReady = useCallback((next: AvatarReady | null) => {
     // Apply the saved look before anything renders from the engine, so panels read the restored values.
-    if (next && savedRef.current) applyAvatarState(next.engine, savedRef.current, variant);
+    if (next && savedRef.current) applyAvatarState(next.engine, savedRef.current, studio ? "studio" : "connected");
     setModel(next); onModelReady?.(next);
-  }, [onModelReady, variant]);
+  }, [onModelReady, studio]);
   const cameraControls = <><button disabled={!model} aria-pressed={closeUp} onClick={() => setCloseUp((value) => !value)}>{closeUp ? "Full body" : "Face view"}</button><button disabled={!model} onClick={() => setRevision((value) => value + 1)}>Reset camera</button></>;
-  return <div className="avatar-workspace">
-    <header className="workspace-header">
+  return <div className={`avatar-workspace ${adminAppearance ? "admin-appearance-workspace" : ""}`}>
+    {!adminAppearance && <header className="workspace-header">
       <div className="brand"><Image className="brand-mark" src="/logo-mark.png" alt="" width={40} height={40} unoptimized priority /><div><h1>Avatar Studio</h1><p className="muted">{studio ? "Pose, express and preview your rigged avatar" : "Live conversation with your avatar"}</p></div></div>
-      <div className="header-actions"><ThemeToggle />{studio ? <Link className="connect-avatar-button" href="/avtaar-connected">Connect avatar<ArrowRightIcon /></Link> : <Link className="back-link" href="/">Back to studio</Link>}</div>
-    </header>
+      <div className="header-actions">{studio ? <><Link className="connect-avatar-button" href="/avtaar-connected">Connect avatar<ArrowRightIcon /></Link></> : <Link className="back-link" href="/">Back to studio</Link>}</div>
+    </header>}
     <div className={`workspace-grid ${studio && !debug ? "panel-hidden" : ""}`}>
       <section className="viewer-section" aria-label="Interactive avatar viewer">
-        <div className="viewer-toolbar"><span className="asset-label"><span className={`status-dot ${model ? "ready" : ""}`} />{model ? `${modelProfile.url.slice(1)} · Ready` : `${modelProfile.url.slice(1)} · Loading`}</span><div>{studio && <><button className="demo-button" disabled={!model} aria-pressed={demo} onClick={() => demoRef.current?.toggleDemo()}>{demo ? "Stop blend demo" : "Run blend demo"}</button><button className="save-button" disabled={!model} onClick={save} title="Save pose, face, behavior, lighting and camera so /avtaar-connected shows the same look"><SaveIcon />Save look</button></>}{cameraControls}{studio && <button aria-expanded={debug} onClick={() => setDebug((value) => !value)}>{debug ? "Hide panel" : "Show panel"}</button>}</div></div>
+        <div className="viewer-toolbar"><span className="asset-label"><span className={`status-dot ${model ? "ready" : ""}`} />{adminAppearance ? "Appearance preview" : model ? `${modelProfile.url.slice(1)} · Ready` : `${modelProfile.url.slice(1)} · Loading`}</span><div>{studio && <><button className="demo-button" disabled={!model} aria-pressed={demo} onClick={() => demoRef.current?.toggleDemo()}>{demo ? "Stop blend demo" : "Run blend demo"}</button><button className="save-button" disabled={!model} onClick={save} title="Save pose, face, behavior, lighting and camera so /avtaar-connected shows the same look"><SaveIcon />Save look</button></>}{cameraControls}{studio && <button aria-expanded={debug} onClick={() => setDebug((value) => !value)}>{debug ? "Hide panel" : "Show panel"}</button>}</div></div>
         <div className="canvas-shell" style={{ background: theme.horizon }}>{studio && <ThemePicker themeId={custom ? customThemeId : themeId} label={theme.label} onChange={chooseTheme} />}<DebugMetricsOverlay model={model} playback={playback} /><ViewerBoundary>
           <Canvas shadows dpr={[1, 1.5]} camera={{ position: [0, 1.65, 5], fov: 38, near: 0.01, far: 100 }} gl={{ antialias: true }} fallback={<div className="viewer-error" role="alert">WebGL is unavailable. Enable hardware acceleration or use a supported browser.</div>}>
             <color attach="background" args={[theme.horizon]} /><fog attach="fog" args={[theme.horizon, 12, 28]} />
