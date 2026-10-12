@@ -1,0 +1,3 @@
+import { NextResponse, type NextRequest } from "next/server";
+export function proxy(request: NextRequest) { const token = request.cookies.get(process.env.AUTH_COOKIE_NAME || "avtaar_session")?.value; const path = request.nextUrl.pathname; if (!token && path.startsWith("/admin")) return NextResponse.redirect(new URL("/auth/login?next=" + encodeURIComponent(path), request.url)); if (!token && path.startsWith("/api/conversations")) return NextResponse.json({ error: "Authentication required." }, { status: 401 }); return NextResponse.next(); }
+export const config = { matcher: ["/admin/:path*", "/api/conversations/:path*"] };
