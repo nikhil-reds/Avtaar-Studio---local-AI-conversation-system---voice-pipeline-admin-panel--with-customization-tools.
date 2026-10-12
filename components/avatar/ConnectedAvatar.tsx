@@ -3,10 +3,10 @@ import { useCallback } from "react";
 import { useAvatarConversation } from "@/hooks/useAvatarConversation";
 import { loadSavedState } from "@/avatar/state/avatarState";
 import AvatarViewer from "./AvatarViewer";
-import GeminiPanel from "./GeminiPanel";
+import LocalConversationPanel from "./LocalConversationPanel";
 import type { AvatarReady } from "./Avatar";
 
-/** The conversation page: shows the avatar exactly as saved in the Studio, with the Gemini connection in the sidebar. */
+/** The conversation page: shows the avatar exactly as saved in the Studio, with the local AI connection in the sidebar. */
 export default function ConnectedAvatar() {
   const conversation = useAvatarConversation();
   const { onModelReady, setBaselineEmotion } = conversation;
@@ -17,5 +17,5 @@ export default function ConnectedAvatar() {
     // The saved expression is what the avatar returns to between and after conversations.
     if (saved) setBaselineEmotion(saved.face.emotion, saved.face.intensity);
   }, [onModelReady, setBaselineEmotion]);
-  return <AvatarViewer variant="connected" onModelReady={handleModelReady} playback={conversation.playback} sidebar={<GeminiPanel conversation={conversation} />} />;
+  return <AvatarViewer variant="connected" onModelReady={handleModelReady} playback={conversation.playback} sidebar={<LocalConversationPanel conversation={conversation} />} />;
 }
