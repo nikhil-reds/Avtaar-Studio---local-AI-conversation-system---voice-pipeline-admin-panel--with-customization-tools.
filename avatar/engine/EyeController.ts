@@ -63,7 +63,7 @@ export const defaultEyeRigConfig: EyeRigConfig = {
   rightEye: "RightEye",
   // Baseline values from the existing implementation; keep calibrated values here after rig validation.
   horizontalLimit: { min: -0.17, max: 0.17 },
-  verticalLimit: { min: -0.06, max: 0.06 },
+  verticalLimit: { min: -0.12, max: 0.12 },
   axisMapping: { pitch: "x", yaw: "z", roll: "y", pitchSign: -1, yawSign: 1, rollSign: 1 },
   restRotation: { left: zeroRotation(), right: zeroRotation() },
   smoothing: 0,
