@@ -43,20 +43,25 @@ export class LocalConversationClient {
     if (!text.trim() || text.length > 4000) throw new Error("Enter a message of up to 4,000 characters.");
     this.callbacks.onTranscript("user", text.trim(), true); this.callbacks.onUserActivity?.(false);
     const response = await fetch(`/api/conversations/${this.conversationId}/messages`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ role: "user", content: text.trim() }) });
-    const payload = await response.json() as { error?: string; assistantMessage?: { content: string } };
-    if (!response.ok || !payload.assistantMessage) throw new Error(payload.error || "Local AI could not answer.");
-    this.callbacks.onTranscript("avatar", payload.assistantMessage.content, true);
-    try {
-      const speech = await fetch("/api/local-ai/synthesize", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ text: payload.assistantMessage.content }) });
-      if (speech.ok) {
-        const audio = decodeWavPcm16(new Uint8Array(await speech.arrayBuffer()));
-        if (audio) this.callbacks.onAudio(audio.bytes, audio.sampleRate);
-      } else {
-        const speechError = await speech.json().catch(() => ({ error: "Local TTS failed." })) as { error?: string };
-        this.callbacks.onError(speechError.error || "Local TTS failed; text response is still available.");
-      }
-    } catch { this.callbacks.onError("Local TTS is unavailable; text response is still available."); }
+    if (!response.ok) { const payload = await response.json() as { error?: string }; throw new Error(payload.error || "Local AI could not answer."); }
+    const history = await response.json() as { messages?: LocalChatMessage[] };
+    const messages = history.messages ?? [{ role: "user" as const, content: text.trim() }];
+    const buffer = new SentenceBuffer(); let fullText = "";
+    for await (const token of streamLocalModel(messages)) {
+      fullText += token; this.callbacks.onTranscript("avatar", token, false);
+      for (const sentence of buffer.push(token)) await this.speak(sentence);
+    }
+    const remainder = buffer.flush(); if (remainder) await this.speak(remainder);
+    if (fullText.trim()) this.callbacks.onTranscript("avatar", "", true);
+    if (fullText.trim()) await fetch(`/api/conversations/${this.conversationId}/messages`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ role: "assistant", content: fullText.trim() }) });
     this.callbacks.onTurnComplete();
+  }
+  private async speak(text: string) {
+    try {
+      const speech = await fetch("/api/local-ai/synthesize", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ text }) });
+      if (speech.ok) { const audio = decodeWavPcm16(new Uint8Array(await speech.arrayBuffer())); if (audio) this.callbacks.onAudio(audio.bytes, audio.sampleRate); }
+      else { const speechError = await speech.json().catch(() => ({ error: "Local TTS failed." })) as { error?: string }; this.callbacks.onError(speechError.error || "Local TTS failed; text response is still available."); }
+    } catch { this.callbacks.onError("Local TTS is unavailable; text response is still available."); }
   }
   stopResponse() { this.callbacks.onInterrupted(); }
 }
@@ -74,3 +79,5 @@ function decodeWavPcm16(bytes: Uint8Array): { bytes: Uint8Array; sampleRate: num
   if (dataStart < 0 || channels !== 1 || bits !== 16 || !sampleRate) return null;
   return { bytes: bytes.slice(dataStart, dataStart + dataSize), sampleRate };
 }
+import { SentenceBuffer } from "./SentenceBuffer";
+import { streamLocalModel, type LocalChatMessage } from "./LocalLLMClient";
