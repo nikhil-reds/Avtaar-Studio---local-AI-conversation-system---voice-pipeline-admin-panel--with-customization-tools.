@@ -17,6 +17,9 @@ interface Resources {
   active: boolean; operation: number;
   recording: boolean; recordingBytes: Uint8Array[];
   timer: ReturnType<typeof setInterval> | null;
+  silenceTimer: ReturnType<typeof setTimeout> | null;
+  heardAudio: boolean;
+  speechFrames: number;
   recordTimer: ReturnType<typeof setTimeout> | null;
 }
 
@@ -74,13 +77,13 @@ export function useAvatarConversation() {
         });
       },
     });
-    resources.current = { player, mic, live, connection: "disconnected", active: true, operation: 0, recording: false, recordingBytes: [], timer: null, recordTimer: null };
+    resources.current = { player, mic, live, connection: "disconnected", active: true, operation: 0, recording: false, recordingBytes: [], timer: null, silenceTimer: null, heardAudio: false, speechFrames: 0, recordTimer: null };
     const refreshDevices = () => { void navigator.mediaDevices?.enumerateDevices().then((items) => { if (active) setDevices(items.filter((item) => item.kind === "audioinput")); }).catch(() => {}); };
     refreshDevices(); navigator.mediaDevices?.addEventListener("devicechange", refreshDevices);
     return () => {
       active = false;
       const current = resources.current;
-      if (current) { current.active = false; current.operation++; }
+      if (current) { current.active = false; current.operation++; if (current.silenceTimer) clearTimeout(current.silenceTimer); }
       if (current?.timer) clearInterval(current.timer);
       if (current?.recordTimer) clearTimeout(current.recordTimer);
       live.disconnect(); mic.stop(); coordinator.dispose(); void player.dispose().catch(() => {}); resources.current = null;
@@ -90,6 +93,7 @@ export function useAvatarConversation() {
 
   const isCurrent = (value: Resources, operation = value.operation) => resources.current === value && value.active && value.operation === operation;
   const stopSample = () => { const value = resources.current; if (value?.timer) clearInterval(value.timer); if (value) value.timer = null; };
+  const clearSpeechTimer = (value: Resources) => { if (value.silenceTimer) clearTimeout(value.silenceTimer); value.silenceTimer = null; value.heardAudio = false; value.speechFrames = 0; };
   const stopRecording = () => {
     const value = resources.current; if (!value) return;
     if (value.recordTimer) clearTimeout(value.recordTimer); value.recordTimer = null;
@@ -98,7 +102,7 @@ export function useAvatarConversation() {
   };
   const disconnect = () => {
     const value = resources.current; if (!value) return;
-    value.operation++;
+    value.operation++; clearSpeechTimer(value);
     stopSample(); stopRecording(); value.live.disconnect(); void value.player.dispose().catch(() => {}); setMicPending(false);
   };
   const connect = async () => {
@@ -116,7 +120,27 @@ export function useAvatarConversation() {
     try {
       await value.player.activate();
       if (!isCurrent(value, operation)) return;
-      const started = await value.mic.start(value.player.audioContext, (bytes) => { if (value.live.connected) value.live.sendAudio(bytes); }, (message) => { setError(message); setMicOn(false); value.live.endAudio(); }, device || undefined);
+      const started = await value.mic.start(value.player.audioContext, (bytes, level) => {
+        if (!value.live.connected) return;
+        value.live.sendAudio(bytes);
+        // Require sustained energy, not one noisy audio frame, before treating
+        // the input as speech. This prevents room noise and mic bumps from
+        // triggering an automatic STT request.
+        if (level > 0.03) value.speechFrames = Math.min(value.speechFrames + 1, 20);
+        else if (level < 0.012) value.speechFrames = Math.max(0, value.speechFrames - 1);
+        if (value.speechFrames >= 8) value.heardAudio = true;
+        if (value.heardAudio && level < 0.008 && !value.silenceTimer) {
+          value.silenceTimer = setTimeout(() => {
+            value.silenceTimer = null;
+            if (!isCurrent(value, operation) || !value.mic.active) return;
+            // End the utterance for STT, but keep the microphone active. The
+            // user controls mute/unmute manually with the microphone button.
+            value.heardAudio = false; value.speechFrames = 0; void value.live.endAudio();
+          }, 900);
+        } else if (level >= 0.008 && value.silenceTimer) {
+          clearTimeout(value.silenceTimer); value.silenceTimer = null;
+        }
+      }, (message) => { clearSpeechTimer(value); setError(message); setMicOn(false); void value.live.endAudio(); }, device || undefined);
       if (started && isCurrent(value, operation) && value.live.connected) { setMicOn(true); const items = await navigator.mediaDevices.enumerateDevices(); if (isCurrent(value, operation)) setDevices(items.filter((item) => item.kind === "audioinput")); }
       else value.mic.stop();
     } catch (cause) { if (isCurrent(value, operation)) setError(cause instanceof Error ? cause.message : "Could not start the microphone."); }
@@ -176,7 +200,7 @@ export function useAvatarConversation() {
   };
   const busy = connection === "connecting" || connection === "reconnecting";
   const connected = connection === "connected";
-  const stopAudio = () => { const value = resources.current; if (value) { value.operation++; if (micPending) value.mic.stop(); } setMicPending(false); stopSample(); value?.live.stopResponse(); coordinator.interrupt(); syncAvatar(); };
+  const stopAudio = () => { const value = resources.current; if (value) { value.operation++; clearSpeechTimer(value); if (micPending) value.mic.stop(); } setMicPending(false); stopSample(); value?.live.stopResponse(); coordinator.interrupt(); syncAvatar(); };
   const setSpeakerMuted = (next: boolean) => { setMuted(next); resources.current?.player.setMuted(next); };
   const setSyncOffset = (value: number) => { const safe = Math.max(0, Math.min(200, Number.isFinite(value) ? value : 0)); setSyncOffsetState(safe); resources.current?.player.setSyncOffsetMs(safe); };
   const setEmotion = (name: string, intensity = 0.7) => { setEmotionState(coordinator.setEmotion(name, intensity)); };
