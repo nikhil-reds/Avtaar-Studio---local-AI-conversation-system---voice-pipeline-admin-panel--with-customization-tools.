@@ -6,6 +6,7 @@ from pathlib import Path
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import Response
 from pydantic import BaseModel
+from piper.download import ensure_voice_exists, find_voice, get_voices
 
 app = FastAPI(title="Avatar Studio local TTS")
 voice_ready = False
@@ -24,8 +25,13 @@ def health():
 def load_voice():
     global voice_ready
     voice = os.getenv("TTS_VOICE", "en_US-lessac-medium")
-    result = subprocess.run(["python", "-m", "piper.download_voices", voice, "--data-dir", "/models"], capture_output=True, check=False)
-    voice_ready = result.returncode == 0
+    try:
+        data_dir = Path("/models")
+        ensure_voice_exists(voice, [data_dir], data_dir, get_voices(data_dir))
+        find_voice(voice, [data_dir])
+        voice_ready = True
+    except Exception:
+        voice_ready = False
 
 
 @app.post("/synthesize")
@@ -38,7 +44,7 @@ def synthesize(request: SpeechRequest):
     output = Path(tempfile.mkstemp(suffix=".wav")[1])
     try:
         result = subprocess.run(
-            ["python", "-m", "piper", "--data-dir", "/models", "--model", os.getenv("TTS_VOICE", "en_US-lessac-medium"), "--output_file", str(output)],
+            ["python", "-m", "piper", "--model", str(Path("/models") / f"{os.getenv('TTS_VOICE', 'en_US-lessac-medium')}.onnx"), "--output_file", str(output)],
             input=text.encode(), capture_output=True, check=False,
         )
         if result.returncode != 0 or not output.exists():
